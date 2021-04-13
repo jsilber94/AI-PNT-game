@@ -1,6 +1,6 @@
 import sys
 import random
-
+import copy
 import numpy as np
 
 
@@ -61,10 +61,16 @@ def play_game(game):
                 break
 
         depth -= 1
-    print(game)
-    print(tokens_left_on_board)
-    print(winner + " won and " + loser + " lost")
-    print("````````````````")
+
+    if winner == "MIN" or winner == "MAX":
+        print(game)
+        print(tokens_left_on_board)
+        print(winner + " won and " + loser + " lost")
+        return
+
+    build_a_tree(tokens_left_on_board, game)
+    x = 6
+    # print("````````````````")
 
 
 def make_first_move(tokens_left_on_board, game):
@@ -103,6 +109,68 @@ def take_a_turn(tokens_left_on_board, game):
     return True
 
 
+def build_a_tree(tokens_left_on_board, game):
+    # careful!!!
+    # opposite of the other mutator
+    # a turn is made based on a copy of the original board
+    # that switches the player therefore switch the mutator because out new board
+
+    parent_node = 1
+    # node_score = evaluate_board(tokens_left_on_board, game)
+    children = {}
+
+
+    while True:
+        tokens_on_board_copy = copy.deepcopy(tokens_left_on_board)
+        game_copy = copy.deepcopy(game)
+        take_a_turn(tokens_on_board_copy, game_copy)
+
+        point = evaluate_board(tokens_on_board_copy, game_copy)
+        children[[tokens_on_board_copy, game_copy]] = point
+        player_mutator = 1 if len(game_copy[2]) % 2 == 0 else -1
+
+        if len(children) == 0:
+            parent_node = point
+        else:
+            parent_node = point * player_mutator
+
+def evaluate_board(tokens_left_on_board, game):
+    player_mutator = 1 if len(game[2]) % 2 == 0 else -1
+
+    last_chosen = game[2][-1]
+    if 1 in tokens_left_on_board:
+        value = 0
+
+    if last_chosen == 1:
+        if len(tokens_left_on_board[3]) % 2 == 0:
+            value = -0.5
+        else:
+            value = 0.5
+
+    if isPrime(last_chosen):
+        possible_multiples = list(range(1, last_chosen, game[1]))
+        if len(possible_multiples) % 2 == 0:
+            value = -0.7
+        else:
+            value = 0.7
+    else:
+        # "If the last move is a composite number (i.e., not prime), find the largest prime that can divide last move, " \
+        # "count the multiples of that prime, including the prime number itself if it hasn’t already been taken, in all the" \
+        # " possible successors. If the count is odd, return 0.6; otherwise, return-0.6."
+        value = .6
+
+    return value * player_mutator
+
+
+# Source: https://www.reddit.com/r/Python/comments/5vwctk/what_is_the_fastest_python_isprime_methodfunction/
+def isPrime(n):
+    if n < 2: return False
+    for x in range(2, int(n ** 0.5) + 1):
+        if n % x == 0:
+            return False
+    return True
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         line = []
@@ -110,7 +178,7 @@ if __name__ == '__main__':
             line.append(sys.argv[i])
         play_game(process_line(line))
     else:
-        play_game([7, 0, [], 0])
+        play_game([7, 0, [], 3])
         # play_game(["Player", 7, 3, [1, 2, 5], 3])
 
 # if player_choices in possible_multiples:
