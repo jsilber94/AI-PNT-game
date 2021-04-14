@@ -29,6 +29,7 @@ def play_game(game):
         visited_nodes = build_a_tree(game_traversal)
         print(visited_nodes)
 
+
 def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
     while depth != 0:
@@ -71,7 +72,7 @@ def build_a_tree(game_traversal):
             moves_chosen.append(previous_parent_turned_child[-1][2][-1])
             game_traversal = make_game_traversal(parent_index, parent[0], parent[1], moves_chosen)
 
-            visited_nodes += do_something(parent_alpha, parent_beta, game_traversal, visited_nodes)
+            nodies = do_something(parent_alpha, parent_beta, game_traversal, visited_nodes)
         else:
             child_alpha, child_beta, nodies = produce_points_for_children(parent, amount_of_tokens_on_board,
                                                                           moves_chosen, visited_nodes)
@@ -84,7 +85,9 @@ def build_a_tree(game_traversal):
                 child_beta = child_alpha
                 child_alpha = -np.inf
             previous_parent_turned_child = parent
+        visited_nodes += nodies
     return visited_nodes
+
 
 def do_something(grandpa_alpha, grandpa_beta, game_traversal, visited_nodes):
     parent_alpha = -np.inf
@@ -96,9 +99,9 @@ def do_something(grandpa_alpha, grandpa_beta, game_traversal, visited_nodes):
         game = copy.deepcopy(parent[1])
 
         response = make_game_move(tokens_on_board, game)
+        visited_nodes += 1
         if not response:
             return visited_nodes
-        visited_nodes+=1
         # get possibly updated value
         child_score = determine_node_score(tokens_on_board, game)
         # determine whos turn
@@ -115,6 +118,7 @@ def do_something(grandpa_alpha, grandpa_beta, game_traversal, visited_nodes):
                 return visited_nodes
 
     return visited_nodes
+
 
 def make_first_move(tokens_left_on_board, game, invalid_choices):
     # round up with a .5
@@ -184,7 +188,7 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             # add to evaluated children
             children.append(child)
             amount_of_tokens_on_board -= 1
-            visited_nodes+=1
+            visited_nodes += 1
             # get possibly updated value
             child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
                                                           child_alpha, child_beta)
@@ -285,7 +289,7 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
     # play_game([7, 0, [], 2])
-    # play_game(["Player", 7, 3, [1, 2, 5], 3])
+    # play_game([7, 3, [1, 4, 2], 3])
     play_game(read_test_cases()[2])
 # if player_choices in possible_multiples:
 #     return game[0] + " lost"
