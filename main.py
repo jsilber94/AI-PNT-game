@@ -1,6 +1,9 @@
 import sys
 import random
 import copy
+# from tokenize import Double
+from lib2to3.pgen2.tokenize import Double
+
 import numpy as np
 
 
@@ -42,7 +45,9 @@ def play_game(game):
 
     if game[-1] == 0:
         game[-1] = -1
-    depth = game[-1]
+    depth = game[-1] - 1
+
+    game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
 
     while depth != 0:
         if game[1] == 0:  # MAX starts first
@@ -60,6 +65,7 @@ def play_game(game):
                 loser = "MIN"
                 break
 
+        game_traversal.append([copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)])
         depth -= 1
 
     if winner == "MIN" or winner == "MAX":
@@ -67,10 +73,9 @@ def play_game(game):
         print(tokens_left_on_board)
         print(winner + " won and " + loser + " lost")
         return
-
-    build_a_tree(tokens_left_on_board, game)
+    # game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
+    build_a_tree(game_traversal)
     x = 6
-    # print("````````````````")
 
 
 def make_first_move(tokens_left_on_board, game):
@@ -78,16 +83,16 @@ def make_first_move(tokens_left_on_board, game):
     limit = int(game[0] / 2 + .5)
     # generate random off number between 1 and limit (inclusively)
     choice = random.randrange(1, limit, 2)
+    # choice = 3
     tokens_left_on_board.remove(choice)
     game[1] += 1
     game[2].append(choice)
+    return True
 
 
 def take_a_turn(tokens_left_on_board, game):
     last_chosen = game[2][-1]
-
     player_choices = []
-    # 3 6 2
 
     while True:
         choice = random.randrange(1, game[0] + 1)
@@ -101,7 +106,7 @@ def take_a_turn(tokens_left_on_board, game):
 
         if set(tokens_left_on_board).issubset(list(set(player_choices))):
             return False
-
+    # remove choice from board and update game
     tokens_left_on_board.remove(choice)
     game[1] += 1
     game[2].append(choice)
@@ -109,30 +114,91 @@ def take_a_turn(tokens_left_on_board, game):
     return True
 
 
-def build_a_tree(tokens_left_on_board, game):
-    # careful!!!
-    # opposite of the other mutator
-    # a turn is made based on a copy of the original board
-    # that switches the player therefore switch the mutator because out new board
-
-    parent_node = 1
-    # node_score = evaluate_board(tokens_left_on_board, game)
-    children = {}
+def produce_children():
+    pass
 
 
-    while True:
-        tokens_on_board_copy = copy.deepcopy(tokens_left_on_board)
-        game_copy = copy.deepcopy(game)
-        take_a_turn(tokens_on_board_copy, game_copy)
+def build_a_tree(game_traversal):
+    parent_alpha = -np.inf  # more then or equal to
+    parent_beta = +np.inf  # less than or equal to
 
-        point = evaluate_board(tokens_on_board_copy, game_copy)
-        children[[tokens_on_board_copy, game_copy]] = point
-        player_mutator = 1 if len(game_copy[2]) % 2 == 0 else -1
+    child_alpha = -np.inf
+    child_beta = +np.inf
 
-        if len(children) == 0:
-            parent_node = point
+    previous_parent_turned_child = None
+
+    # for parent in reversed(game_traversal):
+    for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
+        parent_alpha = child_alpha
+        parent_beta = child_beta
+        child_alpha = -np.inf
+        child_beta = +np.inf
+
+        moves_chosen = []
+        children = []
+        amount_of_tokens_on_board = len(parent[0])
+
+        if previous_parent_turned_child is not None:
+            children.append(previous_parent_turned_child)
+            amount_of_tokens_on_board -= 1
+            moves_chosen.append(previous_parent_turned_child[-1][2][-1])
+            
+        parent,child_alpha,child_beta = produce_children()
+        
+        # produce children
+        while amount_of_tokens_on_board > 0:
+            tokens_on_board = copy.deepcopy(parent[0])
+            game = copy.deepcopy(parent[1])
+
+            # modify the current game with past
+            if len(moves_chosen) != 0:
+                game[1] += 1
+                game[2].append(moves_chosen[-1])
+            tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
+
+            if game[1] == 0:  # MAX starts first
+                res = make_first_move(tokens_on_board, game)
+            else:
+                res = take_a_turn(tokens_on_board, game)
+            if res is False:
+                break
+            child = [tokens_on_board, game]
+
+            if child not in children:
+                # add previously removed choices back
+                child[0].extend(moves_chosen)
+                # add the most current choice
+                moves_chosen.append(child[1][2][-1])
+
+                children.append(child)
+                child_point = evaluate_board(tokens_on_board, game)
+
+                # evaluate child_alpha and child_beta
+                if game[1] % 2 == 0:  # even means child_alpha
+                    if child_alpha == -np.inf or child_alpha < child_point:
+                        child_alpha = child_point
+                        child_beta = np.inf
+                else:  # odd means child_beta
+                    if child_beta == np.inf or child_beta > child_point:
+                        child_beta = child_point
+                        child_alpha = -np.inf
+                amount_of_tokens_on_board -= 1
+
+        #         for index in range(parent_index + 1):
+        #             recursive call
+        
+        # update parent alpha/beta but switch them because its switching game turns
+        if child_alpha is -np.inf:
+            child_alpha = child_beta
+            child_beta = np.inf
+
         else:
-            parent_node = point * player_mutator
+            child_beta = child_alpha
+            child_alpha = -np.inf
+        previous_parent_turned_child = parent
+
+    x = 6
+
 
 def evaluate_board(tokens_left_on_board, game):
     player_mutator = 1 if len(game[2]) % 2 == 0 else -1
@@ -142,7 +208,7 @@ def evaluate_board(tokens_left_on_board, game):
         value = 0
 
     if last_chosen == 1:
-        if len(tokens_left_on_board[3]) % 2 == 0:
+        if len(tokens_left_on_board) % 2 == 0:
             value = -0.5
         else:
             value = 0.5
@@ -178,7 +244,7 @@ if __name__ == '__main__':
             line.append(sys.argv[i])
         play_game(process_line(line))
     else:
-        play_game([7, 0, [], 3])
+        play_game([7, 0, [], 2])
         # play_game(["Player", 7, 3, [1, 2, 5], 3])
 
 # if player_choices in possible_multiples:
