@@ -32,7 +32,7 @@ def play_game(game):
 
 def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
-    while depth != 0:
+    while depth == -1 or depth >= 0 :
         if game[1] == 0:  # MAX starts first
             res = make_first_move(tokens_left_on_board, game, invalid_choices)
             # elif game[1] % 2 == 0:  # MAX's turn
@@ -40,8 +40,8 @@ def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
             res = take_a_turn(tokens_left_on_board, game)
         if not res:
             break
-
-        depth -= 1
+        if depth != -1:
+            depth -= 1
         game_traversal.append([copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)])
 
     return game_traversal
@@ -71,7 +71,10 @@ def build_a_tree(game_traversal):
             amount_of_tokens_on_board -= 1
             moves_chosen.append(previous_parent_turned_child[-1][2][-1])
             game_traversal = make_game_traversal(parent_index, parent[0], parent[1], moves_chosen)
-
+            # game_traversal[0][0].remove(moves_chosen)
+            # if len(moves_chosen) != 0:
+            #     game_traversal[0][0] = [x for x in game_traversal[0][0] if x not in moves_chosen]
+            game_traversal.pop()
             nodies = do_something(parent_alpha, parent_beta, game_traversal, visited_nodes)
         else:
             child_alpha, child_beta, nodies = produce_points_for_children(parent, amount_of_tokens_on_board,
@@ -163,7 +166,7 @@ def first_move_check(limit, invalid_choices, tokens_left_on_board):
         choice = random.randrange(1, limit, 2)
         attemptsss.append(choice)
         attemptsss = np.unique(attemptsss).tolist()
-        if len(attemptsss) >= limit/2:
+        if len(attemptsss) >= limit / 2:
             return -1
 
         if choice not in invalid_choices and choice in tokens_left_on_board:
