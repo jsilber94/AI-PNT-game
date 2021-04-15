@@ -34,12 +34,12 @@ def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
     while depth != 0:
         if game[1] == 0:  # MAX starts first
-            make_first_move(tokens_left_on_board, game, invalid_choices)
-        # elif game[1] % 2 == 0:  # MAX's turn
+            res = make_first_move(tokens_left_on_board, game, invalid_choices)
+            # elif game[1] % 2 == 0:  # MAX's turn
         else:
             res = take_a_turn(tokens_left_on_board, game)
-            if not res:
-                break
+        if not res:
+            break
 
         depth -= 1
         game_traversal.append([copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)])
@@ -76,7 +76,6 @@ def build_a_tree(game_traversal):
         else:
             child_alpha, child_beta, nodies = produce_points_for_children(parent, amount_of_tokens_on_board,
                                                                           moves_chosen, visited_nodes)
-            visited_nodes += nodies
             # update parent alpha/beta but switch them because its switching game turns
             if child_alpha is -np.inf:
                 child_alpha = child_beta
@@ -92,48 +91,85 @@ def build_a_tree(game_traversal):
 def do_something(grandpa_alpha, grandpa_beta, game_traversal, visited_nodes):
     parent_alpha = -np.inf
     parent_beta = +np.inf
+    children = []
 
     # same thing as before but with grandpa
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
         tokens_on_board = copy.deepcopy(parent[0])
-        game = copy.deepcopy(parent[1])
+        # add loop here for other children
+        amount_of_tokens_on_board = len(parent[0])
+        moves_chosen = []
+        while amount_of_tokens_on_board != 0:
+            game = copy.deepcopy(parent[1])
+            # modify the current game with past move as not to repeat the number tokens - moves
+            if len(moves_chosen) != 0:
+                tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
 
-        response = make_game_move(tokens_on_board, game)
-        visited_nodes += 1
-        if not response:
-            return visited_nodes
-        # get possibly updated value
-        child_score = determine_node_score(tokens_on_board, game)
-        # determine whos turn
-        if game[1] % 2 == 0:
-            parent_alpha = child_score
-        else:
-            parent_beta = child_score
+            # check if starting places exist
+            response = make_game_move(tokens_on_board, game)
 
-        if grandpa_alpha != -np.inf:  # more than
-            if parent_beta < grandpa_alpha:
-                return visited_nodes
-        else:
-            if parent_alpha > grandpa_beta:
-                return visited_nodes
+            if not response:
+                break
+                # return visited_nodes
 
+            if game not in children:
+                # get possibly updated value
+                child_score = determine_node_score(tokens_on_board, game)
+                # determine whos turn
+                if game[1] % 2 == 0:
+                    parent_alpha = child_score
+                else:
+                    parent_beta = child_score
+
+                if grandpa_alpha != -np.inf:  # more than
+                    if parent_beta < grandpa_alpha:
+                        break
+                        # return visited_nodes
+                else:
+                    if parent_alpha > grandpa_beta:
+                        break
+                        # return visited_nodes
+                visited_nodes, amount_of_tokens_on_board = child_and_children(visited_nodes, amount_of_tokens_on_board,
+                                                                              game, children, moves_chosen)
     return visited_nodes
+
+
+def child_and_children(visited_nodes, amount_of_tokens_on_board, child, children, moves_chosen):
+    visited_nodes += 1
+    amount_of_tokens_on_board -= 1
+    children.append(copy.deepcopy(child))
+    moves_chosen.append(children[-1][2][-1])
+
+    return visited_nodes, amount_of_tokens_on_board
 
 
 def make_first_move(tokens_left_on_board, game, invalid_choices):
     # round up with a .5
     limit = int(game[0] / 2 + .5)
 
-    # generate random off number between 1 and limit (inclusively)
-    while True:
-        choice = random.randrange(1, limit, 2)
-        if choice not in invalid_choices:
-            break
-    # choice = 3
+    choice = first_move_check(limit, invalid_choices, tokens_left_on_board)
+    if choice == -1:
+        return False
     tokens_left_on_board.remove(choice)
     game[1] += 1
     game[2].append(choice)
     return True
+
+
+def first_move_check(limit, invalid_choices, tokens_left_on_board):
+    attemptsss = []
+    # generate random off number between 1 and limit (inclusively)
+    while True:
+        choice = random.randrange(1, limit, 2)
+        attemptsss.append(choice)
+        attemptsss = np.unique(attemptsss).tolist()
+        if len(attemptsss) >= limit/2:
+            return -1
+
+        if choice not in invalid_choices and choice in tokens_left_on_board:
+            return choice
+
+    # choice = 3
 
 
 def take_a_turn(tokens_left_on_board, game):
@@ -183,16 +219,21 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
         if child not in children:
             # add previously removed choices back
             child[0].extend(moves_chosen)
+
             # add the most current choice
-            moves_chosen.append(child[1][2][-1])
-            # add to evaluated children
-            children.append(child)
-            amount_of_tokens_on_board -= 1
-            visited_nodes += 1
+            # moves_chosen.append(child[1][2][-1])
+            # # add to evaluated children
+            # children.append(child)
+            # amount_of_tokens_on_board -= 1
+            # visited_nodes += 1
+
+            visited_nodes, amount_of_tokens_on_board = child_and_children(visited_nodes, amount_of_tokens_on_board,
+                                                                          child[1], children, moves_chosen)
+
             # get possibly updated value
             child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
                                                           child_alpha, child_beta)
-
+            x = 6
     return child_alpha, child_beta, visited_nodes
 
 
@@ -288,9 +329,10 @@ if __name__ == '__main__':
     #         line.append(sys.argv[i])
     #     play_game(process_line(line))
     # else:
-    # play_game([7, 0, [], 2])
+
+    play_game([7, 0, [], 2])
     # play_game([7, 3, [1, 4, 2], 3])
-    play_game(read_test_cases()[2])
+    # play_game(read_test_cases()[2])
 # if player_choices in possible_multiples:
 #     return game[0] + " lost"
 # possible_multiples = list(range(1, last_chosen, game[1]))
