@@ -224,10 +224,14 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
     child_beta = +np.inf
     children = []
 
+    parent_alpha = -np.inf
+    parent_beta = +np.inf
+
     # produce possible children
     while amount_of_tokens_on_board > 0:
         tokens_on_board = copy.deepcopy(parent[0])
         game = copy.deepcopy(parent[1])
+
 
         # modify the current game with past move as not to repeat the number
         if len(moves_chosen) != 0:
@@ -258,7 +262,13 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             # get possibly updated value
             child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
                                                           child_alpha, child_beta)
-            x = 6
+
+
+            if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
+                break
+
+
+
     return child_alpha, child_beta, total_visited_nodes
 
 
