@@ -9,10 +9,6 @@ def play_game(game):
     for num in game[2]:
         tokens_left_on_board.remove(num)
 
-    print(game)
-    print(tokens_left_on_board)
-    print("````````````````")
-
     winner = "J"
     loser = "D"
 
@@ -39,13 +35,15 @@ def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     while depth > 0:
         if game[1] == 0:  # MAX starts first
             res = make_first_move(tokens_left_on_board, game, invalid_choices)
+            # elif game[1] % 2 == 0:  # MAX's turn
         else:
+            tokens_left_on_board = [x for x in tokens_left_on_board if x not in invalid_choices]
             res = take_a_turn(tokens_left_on_board, game)
         if not res:
             break
         if depth != -1:
             depth -= 1
-        game_traversal.append([copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)])
+        game_traversal.append([copy.deepcopy(tokens_left_on_board + invalid_choices), copy.deepcopy(game)])
 
     return game_traversal
 
@@ -61,7 +59,6 @@ def build_a_tree(game_traversal):
 
     # iterate depth times
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
-
         parent_alpha = child_alpha
         parent_beta = child_beta
 
@@ -71,10 +68,13 @@ def build_a_tree(game_traversal):
         amount_of_tokens_on_board = len(parent[0])
 
         if previous_parent_turned_child is not None:
+
             children.append(previous_parent_turned_child)  # we have a score so its children dont matter
             amount_of_tokens_on_board -= 1
             moves_chosen.append(previous_parent_turned_child[-1][2][-1])
-            game_traversal = make_game_traversal(parent_index, parent[0], parent[1], moves_chosen)
+
+            new_game_traversal = make_game_traversal(parent_index, copy.deepcopy(parent[0]), copy.deepcopy(parent[1]),
+                                                     moves_chosen)
             # game_traversal[0][0].remove(moves_chosen)
             # if len(moves_chosen) != 0:
             #     game_traversal[0][0] = [x for x in game_traversal[0][0] if x not in moves_chosen]
@@ -85,9 +85,11 @@ def build_a_tree(game_traversal):
             # the bottom most left child is in the list as the last element in the list
             # why would we want the children of the parent node calculated when they are already in the list
 
-            game_traversal.pop()
-            visited_nodes = produce_points_for_children_with_parent_value(parent_alpha, parent_beta, game_traversal,
+            new_game_traversal.pop(0)
+            # pass is as beta,alpha but accept as alpha,beta
+            visited_nodes = produce_points_for_children_with_parent_value(parent_beta, parent_alpha, new_game_traversal,
                                                                           total_visited_nodes)
+        #     x=6
         else:
             child_alpha, child_beta, visited_nodes = produce_points_for_children(parent, amount_of_tokens_on_board,
                                                                                  moves_chosen, total_visited_nodes)
@@ -99,9 +101,11 @@ def build_a_tree(game_traversal):
                 child_beta = child_alpha
                 child_alpha = -np.inf
             previous_parent_turned_child = parent
-        total_visited_nodes += visited_nodes
+            # total_visited_nodes += visited_nodes
+
         print(parent)
-        print("-----")
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        previous_parent_turned_child = parent
     return total_visited_nodes
 
 
@@ -109,7 +113,7 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
     parent_alpha = -np.inf
     parent_beta = +np.inf
     children = []
-
+    # game_traversal_copy = copy.deepcopy(game_traversal)
     # same thing as before but with grandpa
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
         tokens_on_board = copy.deepcopy(parent[0])
@@ -131,7 +135,7 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
                 # return total_visited_nodes
 
             if current_parent_game not in children:
-
+                print(current_parent_game)
                 # get possibly updated value
                 child_score = determine_node_score(tokens_on_board, current_parent_game)
                 # determine whos turn
@@ -142,20 +146,20 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
 
                 if grandpa_alpha != -np.inf:  # more than
                     if parent_beta < grandpa_alpha:
+                        print("Prune rest")
                         break
                         # return total_visited_nodes
                 else:
                     if parent_alpha > grandpa_beta:
+                        print("Prune rest")
                         break
                         # return total_visited_nodes
                 total_visited_nodes, amount_of_tokens_on_board = process_child_into_children(total_visited_nodes,
                                                                                              amount_of_tokens_on_board,
                                                                                              current_parent_game,
                                                                                              children, moves_chosen)
-
-                # if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent_game)):
-                #     break
-        print("-----------------------")
+        print(parent)
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
     return total_visited_nodes
 
 
@@ -186,18 +190,18 @@ def make_first_move(tokens_left_on_board, game, invalid_choices):
 
 
 def first_move_check(limit, invalid_choices, tokens_left_on_board):
-    attemptsss = []
+    attempts = []
     # generate random off number between 1 and limit (inclusively)
     while True:
         choice = random.randrange(1, limit, 2)
-        attemptsss.append(choice)
-        attemptsss = np.unique(attemptsss).tolist()
-        if len(attemptsss) >= limit / 2:
-            return -1
+        attempts.append(choice)
+        attempts = np.unique(attempts).tolist()
 
         if choice not in invalid_choices and choice in tokens_left_on_board:
             return choice
 
+        if len(attempts) >= limit / 2:
+            return -1
     # choice = 3
 
 
@@ -249,7 +253,7 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
 
         child = [tokens_on_board, game]
         if child not in children:
-            print(child)
+            print(child[1])
             # add previously removed choices back
             child[0].extend(moves_chosen)
 
@@ -304,24 +308,36 @@ def determine_node_score(tokens_left_on_board, game):
 
     # if 1 in tokens_left_on_board:
     value = 0
-
-    if last_chosen == 1:
+    if 1 in tokens_left_on_board:
+        value = 0
+    elif last_chosen == 1:
         if len(tokens_left_on_board) % 2 == 0:
             value = -0.5
         else:
             value = 0.5
 
-    if is_prime(last_chosen):
-        possible_multiples = list(range(1, last_chosen, game[1]))
-        if len(possible_multiples) % 2 == 0:
+    elif is_prime(last_chosen):
+        possible_multiples_count = 0
+        for value in tokens_left_on_board:
+            if value != last_chosen and value % last_chosen == 0:
+                possible_multiples_count += 1
+
+        if possible_multiples_count % 2 == 0:
             value = -0.7
         else:
             value = 0.7
     else:
-        # "If the last move is a composite number (i.e., not prime), find the largest prime that can divide last move,
-        # count the multiples of that prime, including the prime number itself if it hasn't already been taken,
-        # in all the" possible successors. If the count is odd, return 0.6; otherwise, return-0.6."
-        value = .6
+        prime_factor = largest_prime_factor(last_chosen)
+        possible_multiples_count = 0
+
+        for value in tokens_left_on_board:
+            if value != last_chosen and value % prime_factor == 0:
+                possible_multiples_count += 1
+
+        if possible_multiples_count % 2 == 0:
+            value = -0.6
+        else:
+            value = 0.6
 
     return value * player_mutator
 
@@ -360,6 +376,33 @@ def is_prime(n):
     return True
 
 
+def largest_prime_factor(n):
+    prime_factor = 1
+    i = 2
+
+    while i <= n / i:
+        if n % i == 0:
+            prime_factor = i
+            n /= i
+        else:
+            i += 1
+
+    if prime_factor < n:
+        prime_factor = n
+
+    return prime_factor
+
+
+def print_output(move: str, value: float, visited_nodes: int, evaluated_nodes: int, max_depth_reach: int,
+                 avg_branching: float):
+    print(f'Move: {move}')
+    print(f'Value: {value:.1f}')
+    print(f'Number of nodes visited: {str(visited_nodes)}')
+    print(f'Number of nodes evaluated: {str(evaluated_nodes)}')
+    print(f'Max depth reach: {str(max_depth_reach)}')
+    print(f'Avg Effective Branching Factor: {avg_branching:.1f}')
+
+
 if __name__ == '__main__':
     # if len(sys.argv) > 1:
     #     line = []
@@ -368,7 +411,7 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
 
-    play_game([7, 0, [], 2])
+    play_game([7, 0, [], 3])
     # play_game([7, 3, [1, 4, 2], 3])
     # play_game(read_test_cases()[2])
 # if player_choices in possible_multiples:
