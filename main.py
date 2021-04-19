@@ -180,13 +180,13 @@ def make_first_move(tokens_left_on_board, game, invalid_choices):
 
 
 def first_move_check(limit, invalid_choices, tokens_left_on_board):
-    attemptsss = []
+    attempts = []
     # generate random off number between 1 and limit (inclusively)
     while True:
         choice = random.randrange(1, limit, 2)
-        attemptsss.append(choice)
-        attemptsss = np.unique(attemptsss).tolist()
-        if len(attemptsss) >= limit / 2:
+        attempts.append(choice)
+        attempts = np.unique(attempts).tolist()
+        if len(attempts) >= limit / 2:
             return -1
 
         if choice not in invalid_choices and choice in tokens_left_on_board:
@@ -232,7 +232,6 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
         tokens_on_board = copy.deepcopy(parent[0])
         game = copy.deepcopy(parent[1])
 
-
         # modify the current game with past move as not to repeat the number
         if len(moves_chosen) != 0:
             tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
@@ -263,11 +262,8 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
                                                           child_alpha, child_beta)
 
-
             if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
                 break
-
-
 
     return child_alpha, child_beta, total_visited_nodes
 
@@ -301,24 +297,36 @@ def determine_node_score(tokens_left_on_board, game):
 
     # if 1 in tokens_left_on_board:
     value = 0
-
-    if last_chosen == 1:
+    if 1 in tokens_left_on_board:
+        value = 0
+    elif last_chosen == 1:
         if len(tokens_left_on_board) % 2 == 0:
             value = -0.5
         else:
             value = 0.5
 
-    if is_prime(last_chosen):
-        possible_multiples = list(range(1, last_chosen, game[1]))
-        if len(possible_multiples) % 2 == 0:
+    elif is_prime(last_chosen):
+        possible_multiples_count = 0
+        for value in tokens_left_on_board:
+            if value != last_chosen and value % last_chosen == 0:
+                possible_multiples_count += 1
+
+        if possible_multiples_count % 2 == 0:
             value = -0.7
         else:
             value = 0.7
     else:
-        # "If the last move is a composite number (i.e., not prime), find the largest prime that can divide last move,
-        # count the multiples of that prime, including the prime number itself if it hasn't already been taken,
-        # in all the" possible successors. If the count is odd, return 0.6; otherwise, return-0.6."
-        value = .6
+        prime_factor = largest_prime_factor(last_chosen)
+        possible_multiples_count = 0
+
+        for value in tokens_left_on_board:
+            if value != last_chosen and value % prime_factor == 0:
+                possible_multiples_count += 1
+
+        if possible_multiples_count % 2 == 0:
+            value = -0.6
+        else:
+            value = 0.6
 
     return value * player_mutator
 
@@ -355,6 +363,33 @@ def is_prime(n):
         if n % x == 0:
             return False
     return True
+
+
+def largest_prime_factor(n):
+    prime_factor = 1
+    i = 2
+
+    while i <= n / i:
+        if n % i == 0:
+            prime_factor = i
+            n /= i
+        else:
+            i += 1
+
+    if prime_factor < n:
+        prime_factor = n
+
+    return prime_factor
+
+
+def print_output(move: str, value: float, visited_nodes: int, evaluated_nodes: int, max_depth_reach: int,
+                 avg_branching: float):
+    print(f'Move: {move}')
+    print(f'Value: {value:.1f}')
+    print(f'Number of nodes visited: {str(visited_nodes)}')
+    print(f'Number of nodes evaluated: {str(evaluated_nodes)}')
+    print(f'Max depth reach: {str(max_depth_reach)}')
+    print(f'Avg Effective Branching Factor: {avg_branching:.1f}')
 
 
 if __name__ == '__main__':
