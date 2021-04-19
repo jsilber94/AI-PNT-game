@@ -113,6 +113,9 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
     parent_alpha = -np.inf
     parent_beta = +np.inf
     children = []
+
+
+
     # game_traversal_copy = copy.deepcopy(game_traversal)
     # same thing as before but with grandpa
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
@@ -132,7 +135,6 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
 
             if not response:
                 break
-                # return total_visited_nodes
 
             if current_parent_game not in children:
                 print(current_parent_game)
