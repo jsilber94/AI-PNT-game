@@ -275,8 +275,8 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
                                                           child_alpha, child_beta)
 
-            # if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
-            #     break
+            if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
+                break
 
     return child_alpha, child_beta, total_visited_nodes
 
