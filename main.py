@@ -127,10 +127,11 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
             if len(moves_chosen) != 0:
                 tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
 
-            # if len(moves_chosen_new) != 0:
-            #     tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen_new]
+            if len(moves_chosen_new) != 0:
+                tokens_on_board_new = [x for x in tokens_on_board if x not in moves_chosen_new]
+
             # check if starting places exist
-            response = make_game_move(tokens_on_board, current_parent_game)
+            response = make_game_move(tokens_on_board_new, current_parent_game)
 
             if not response:
                 break
@@ -138,7 +139,7 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
             if current_parent_game not in children:
                 # get children
 
-                current_node_game_traversal = make_game_traversal(parent_index, copy.deepcopy(tokens_on_board),
+                current_node_game_traversal = make_game_traversal(parent_index, copy.deepcopy(tokens_on_board_new),
                                                                   copy.deepcopy(current_parent_game),
                                                                   moves_chosen)
                 current_node_game_traversal[0][0] = list(set(current_node_game_traversal[0][0] + moves_chosen))
