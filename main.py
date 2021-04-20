@@ -22,8 +22,19 @@ def play_game(game):
         print(winner + " won and " + loser + " lost")
     else:
         game_traversal = make_game_traversal(depth, tokens_left_on_board, game, [])
-        total_visited_nodes = build_a_tree(game_traversal)
-        print(total_visited_nodes)
+        correct_move, alpha_score, total_visited_nodes, evaluated_nodes, max_depth_reached, avg_branching = \
+            build_a_tree(game_traversal)
+        print_output(correct_move, alpha_score, total_visited_nodes, evaluated_nodes, max_depth_reached, avg_branching)
+
+
+def print_output(move: str, value: float, visited_nodes: int, evaluated_nodes: int, max_depth_reach: int,
+                 avg_branching: float):
+    print(f'Move: {move}')
+    print(f'Value: {value:.1f}')
+    print(f'Number of nodes visited: {str(visited_nodes)}')
+    print(f'Number of nodes evaluated: {str(evaluated_nodes)}')
+    print(f'Max depth reach: {str(max_depth_reach)}')
+    print(f'Avg Effective Branching Factor: {avg_branching:.1f}')
 
 
 def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
@@ -48,17 +59,33 @@ def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     return game_traversal
 
 
+def update_max_depth(game, max_depth):
+    if len(game[2]) > max_depth:
+        max_depth = len(game[2])
+    return max_depth
+
+
 def build_a_tree(game_traversal):
     parent_alpha = -np.inf  # more then or equal to
     parent_beta = +np.inf  # less than or equal to
 
     child_alpha = -np.inf
     child_beta = +np.inf
-    total_visited_nodes = 0
+    total_evaluated_nodes = 0
     previous_parent_turned_child = None
+
+    max_depth = 0
+    visited = set()
+    for item in game_traversal:
+        visited.add(tuple(item[1][2]))
+        max_depth = update_max_depth(item[1], max_depth)
+
+    winning_path = []
 
     # iterate depth times
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
+        visited.add(tuple(parent[1][2]))
+
         parent_alpha = child_alpha
         parent_beta = child_beta
 
@@ -87,12 +114,21 @@ def build_a_tree(game_traversal):
 
             new_game_traversal.pop(0)
             # pass is as beta,alpha but accept as alpha,beta
-            visited_nodes = produce_points_for_children_with_parent_value(parent_beta, parent_alpha, new_game_traversal,
-                                                                          total_visited_nodes)
+            visited, total_evaluated_nodes, max_depth = produce_points_for_children_with_parent_value(parent_beta,
+                                                                                                      parent_alpha,
+                                                                                                      new_game_traversal,
+                                                                                                      visited,
+                                                                                                      total_evaluated_nodes,
+                                                                                                      max_depth)
         #     x=6
         else:
-            child_alpha, child_beta, visited_nodes = produce_points_for_children(parent, amount_of_tokens_on_board,
-                                                                                 moves_chosen, total_visited_nodes)
+            child_alpha, child_beta, visited, winning_path, total_evaluated_nodes, max_depth = produce_points_for_children(
+                parent,
+                amount_of_tokens_on_board,
+                moves_chosen,
+                total_evaluated_nodes,
+                visited, max_depth)
+
             # update parent alpha/beta but switch them because its switching game turns
             if child_alpha is -np.inf:
                 child_alpha = child_beta
@@ -101,24 +137,25 @@ def build_a_tree(game_traversal):
                 child_beta = child_alpha
                 child_alpha = -np.inf
             previous_parent_turned_child = parent
-            # total_visited_nodes += visited_nodes
 
         print(parent)
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         previous_parent_turned_child = parent
-    return total_visited_nodes
+    print("Winning path: " + str(winning_path))
+    return winning_path[0] if winning_path else None, child_alpha, len(
+        visited), total_evaluated_nodes, max_depth - 1, calculate_branching_factor_from_visited_nodes(visited)
 
 
-def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, game_traversal, total_visited_nodes):
+def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, game_traversal, visited,
+                                                  total_evaluated_nodes, max_depth):
     parent_alpha = -np.inf
     parent_beta = +np.inf
     children = []
 
-
-
     # game_traversal_copy = copy.deepcopy(game_traversal)
     # same thing as before but with grandpa
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
+        visited.add(tuple(parent[1][2]))
         tokens_on_board = copy.deepcopy(parent[0])
         # add loop here for other children
         amount_of_tokens_on_board = len(parent[0])
@@ -136,11 +173,26 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
             if not response:
                 break
 
+            visited.add(tuple(current_parent_game[2]))
+            max_depth = update_max_depth(current_parent_game, max_depth)
+
             if current_parent_game not in children:
                 print(current_parent_game)
+
+                total_evaluated_nodes += 1
+
                 # get possibly updated value
                 child_score = determine_node_score(tokens_on_board, current_parent_game)
                 # determine whos turn
+
+                if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent_game)):
+                    if len(tokens_on_board) % 2 == 0:
+                        child_score = 1
+                    else:
+                        child_score = -1
+                    winning_path = current_parent_game[2]
+                    break
+
                 if current_parent_game[1] % 2 == 0:
                     parent_alpha = child_score
                 else:
@@ -156,18 +208,15 @@ def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, g
                         print("Prune rest")
                         break
                         # return total_visited_nodes
-                total_visited_nodes, amount_of_tokens_on_board = process_child_into_children(total_visited_nodes,
-                                                                                             amount_of_tokens_on_board,
-                                                                                             current_parent_game,
-                                                                                             children, moves_chosen)
+                amount_of_tokens_on_board = process_child_into_children(amount_of_tokens_on_board,
+                                                                        current_parent_game,
+                                                                        children, moves_chosen)
         print(parent)
         print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    return total_visited_nodes
+    return visited, total_evaluated_nodes, max_depth
 
 
-def process_child_into_children(total_visited_nodes, amount_of_tokens_on_board, child, children, moves_chosen):
-    # increment total visited nodes
-    total_visited_nodes += 1
+def process_child_into_children(amount_of_tokens_on_board, child, children, moves_chosen):
     # decrement the amount of tokens on board
     amount_of_tokens_on_board -= 1
     # add a copy of the child into children
@@ -175,7 +224,7 @@ def process_child_into_children(total_visited_nodes, amount_of_tokens_on_board, 
     # add the number that was chosen, its state is represented by child
     moves_chosen.append(children[-1][2][-1])
 
-    return total_visited_nodes, amount_of_tokens_on_board
+    return amount_of_tokens_on_board
 
 
 def make_first_move(tokens_left_on_board, game, invalid_choices):
@@ -231,9 +280,11 @@ def take_a_turn(tokens_left_on_board, game):
     return True
 
 
-def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen, total_visited_nodes):
+def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
+                                total_evaluated_nodes, visited, max_depth):
     child_alpha = -np.inf
     child_beta = +np.inf
+    winning_path = []
     children = []
 
     parent_alpha = -np.inf
@@ -254,6 +305,9 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             break
 
         child = [tokens_on_board, game]
+        visited.add(tuple(child[1][2]))
+        max_depth = update_max_depth(child[1], max_depth)
+
         if child not in children:
             print(child[1])
             # add previously removed choices back
@@ -266,35 +320,42 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
             # amount_of_tokens_on_board -= 1
             # total_visited_nodes += 1
 
-            total_visited_nodes, amount_of_tokens_on_board = process_child_into_children(total_visited_nodes,
-                                                                                         amount_of_tokens_on_board,
-                                                                                         child[1], children,
-                                                                                         moves_chosen)
+            amount_of_tokens_on_board = process_child_into_children(amount_of_tokens_on_board,
+                                                                    child[1], children,
+                                                                    moves_chosen)
 
             # get possibly updated value
-            child_alpha, child_beta = evaluate_alpha_beta(tokens_on_board, game,
-                                                          child_alpha, child_beta)
+            child_alpha, child_beta, winning_path = evaluate_alpha_beta(tokens_on_board, game,
+                                                                        child_alpha, child_beta, winning_path)
+            total_evaluated_nodes += 1
 
             if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
+                if len(tokens_on_board) % 2 == 0:
+                    child_beta = 1
+                else:
+                    child_alpha = -1
+                winning_path = game[2]
                 break
 
-    return child_alpha, child_beta, total_visited_nodes
+    return child_alpha, child_beta, visited, winning_path, total_evaluated_nodes, max_depth
 
 
-def evaluate_alpha_beta(tokens_on_board, game, child_alpha, child_beta):
+def evaluate_alpha_beta(tokens_on_board, game, child_alpha, child_beta, winning_path):
     # are you a base node
     child_point = determine_node_score(tokens_on_board, game)
 
     # evaluate child_alpha and child_beta
     if game[1] % 2 == 0:  # even means child_alpha
-        if child_alpha == -np.inf or child_alpha < child_point:
+        if child_alpha == -np.inf or child_alpha > child_point:
             child_alpha = child_point
             child_beta = np.inf
+            winning_path = game[2]
     else:  # odd means child_beta
-        if child_beta == np.inf or child_beta > child_point:
+        if child_beta == np.inf or child_beta < child_point:
             child_beta = child_point
             child_alpha = -np.inf
-    return child_alpha, child_beta
+            winning_path = game[2]
+    return child_alpha, child_beta, winning_path
 
 
 def make_game_move(tokens_on_board, game):
@@ -378,6 +439,44 @@ def is_prime(n):
     return True
 
 
+def calculate_branching_factor_from_visited_nodes(visited_nodes: {tuple}):
+    list_of_relations = list()
+    number_of_branch = 0
+
+    if tuple() in visited_nodes:
+        for item in visited_nodes:
+            if len(item) == 1:
+                number_of_branch += 1
+
+        list_of_relations.append(number_of_branch)
+        number_of_branch = 0
+
+    for x in visited_nodes:
+        for y in visited_nodes:
+            if x and y and len(x) == len(y) - 1 and is_part_of(x, y):
+                number_of_branch += 1
+        list_of_relations.append(number_of_branch)
+        number_of_branch = 0
+
+    clean_list = list()
+
+    for item in list_of_relations:
+        if item != 0:
+            clean_list.append(item)
+
+    return sum(clean_list) / len(clean_list)
+
+
+def is_part_of(a: tuple, b: tuple):
+    part_of = True
+
+    for x in range(len(a)):
+        if a[x] != b[x]:
+            part_of = False
+
+    return part_of
+
+
 def largest_prime_factor(n):
     prime_factor = 1
     i = 2
@@ -395,16 +494,6 @@ def largest_prime_factor(n):
     return prime_factor
 
 
-def print_output(move: str, value: float, visited_nodes: int, evaluated_nodes: int, max_depth_reach: int,
-                 avg_branching: float):
-    print(f'Move: {move}')
-    print(f'Value: {value:.1f}')
-    print(f'Number of nodes visited: {str(visited_nodes)}')
-    print(f'Number of nodes evaluated: {str(evaluated_nodes)}')
-    print(f'Max depth reach: {str(max_depth_reach)}')
-    print(f'Avg Effective Branching Factor: {avg_branching:.1f}')
-
-
 if __name__ == '__main__':
     # if len(sys.argv) > 1:
     #     line = []
@@ -413,7 +502,7 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
 
-    play_game([7, 0, [], 3])
+    play_game([7, 1, [1], 2])
     # play_game([7, 3, [1, 4, 2], 3])
     # play_game(read_test_cases()[2])
 # if player_choices in possible_multiples:
