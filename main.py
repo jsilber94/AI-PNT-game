@@ -291,6 +291,14 @@ def depth_children(depth, tokens_on_board_original, game_original, grandpa_beta,
             else:
                 parent_beta = child_score
 
+            if parent_alpha == -np.inf:
+                parent_alpha = parent_beta
+                parent_beta = np.inf
+            elif parent_beta == +np.inf:
+                parent_beta = parent_alpha
+                parent_alpha = -np.inf
+
+
             if grandpa_alpha != -np.inf:  # more than
                 if parent_beta < grandpa_alpha:
                     print("Prune rest because grandparent")
