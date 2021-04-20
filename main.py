@@ -129,7 +129,7 @@ def build_a_tree(game_traversal):
             else:
 
                 parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = produce_points_for_children(
-                    copy.deepcopy(parent), amount_of_tokens_on_board, total_evaluated_nodes, visited, max_depth, None)
+                    copy.deepcopy(parent), amount_of_tokens_on_board, total_evaluated_nodes, visited, max_depth)
 
                 if parent_alpha == -np.inf:
                     parent_alpha = parent_beta
@@ -227,13 +227,16 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
                 if grandpa_alpha != -np.inf:  # more than
                     if parent_beta < grandpa_alpha:
                         print("Prune rest")
+                        winning_path = current_parent[2]
                         break
                 else:
                     if parent_alpha > grandpa_beta:
+                        winning_path = current_parent[2]
                         print("Prune rest")
                         break
 
                     amount_of_children += 1
+
 
     return visited, winning_path, total_evaluated_nodes, max_depth, parent_alpha, parent_beta
 
@@ -367,7 +370,7 @@ def take_a_turn(tokens_left_on_board, game):
 
 
 def produce_points_for_children(parent, amount_of_tokens_on_board,
-                                total_evaluated_nodes, visited, max_depth, score):
+                                total_evaluated_nodes, visited, max_depth):
     winning_path = []
     children = []
 
@@ -416,9 +419,9 @@ def produce_points_for_children(parent, amount_of_tokens_on_board,
 
         if child not in children:
 
+            print(child[1])
             if not response:
                 return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
-            print(child[1])
             visited.add(tuple(child[1][2]))
             max_depth = update_max_depth(child[1], max_depth)
 
