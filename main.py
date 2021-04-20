@@ -41,20 +41,20 @@ def make_game_traversal(depth, tokens_left_on_board, game, invalid_choices):
     game_traversal = [[copy.deepcopy(tokens_left_on_board), copy.deepcopy(game)]]
 
     if depth == -1:
-        depth = 999
+        depth = -2
 
-    while depth > 0:
+    while depth >= 0 or depth == -2:
         if game[1] == 0:  # MAX starts first
             res = make_first_move(tokens_left_on_board, game, invalid_choices)
-            # elif game[1] % 2 == 0:  # MAX's turn
         else:
             tokens_left_on_board = [x for x in tokens_left_on_board if x not in invalid_choices]
             res = take_a_turn(tokens_left_on_board, game)
         if not res:
             break
-        if depth != -1:
+        if depth != -2:
             depth -= 1
-        game_traversal.append([copy.deepcopy(list(set(tokens_left_on_board + invalid_choices))), copy.deepcopy(game)])
+        game_traversal.append(
+            [copy.deepcopy(list(set(tokens_left_on_board + invalid_choices))), copy.deepcopy(game)])
 
     return game_traversal
 
@@ -86,156 +86,242 @@ def build_a_tree(game_traversal):
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
         visited.add(tuple(parent[1][2]))
 
-        parent_alpha = child_alpha
-        parent_beta = child_beta
+        if make_game_move(copy.deepcopy(parent[0]), copy.deepcopy(parent[1])):
 
-        # keep track of previous parent node
-        moves_chosen = []
-        children = []
-        amount_of_tokens_on_board = len(parent[0])
+            # keep track of previous parent node
+            moves_chosen = []
+            amount_of_tokens_on_board = len(parent[0])
 
-        if previous_parent_turned_child is not None:
+            if previous_parent_turned_child is not None:
 
-            children.append(previous_parent_turned_child)  # we have a score so its children dont matter
-            amount_of_tokens_on_board -= 1
-            moves_chosen.append(previous_parent_turned_child[-1][2][-1])
+                if parent[1][1] % 2 == 0:
+                    if parent_beta == 1:
+                        # automatic loss, prune
+                        previous_parent_turned_child = parent
+                        continue
+                else:
+                    if parent_alpha == -1:
+                        # automatic win, prune
+                        previous_parent_turned_child = parent
+                        continue
 
-            new_game_traversal = make_game_traversal(parent_index, copy.deepcopy(parent[0]),
-                                                     copy.deepcopy(parent[1]),
-                                                     moves_chosen)
+                amount_of_tokens_on_board -= 1
+                moves_chosen.append(previous_parent_turned_child[-1][2][-1])
 
-            new_game_traversal.pop(0)
-            # pass is as beta,alpha but accept as alpha,beta
-            visited, total_evaluated_nodes, max_depth = produce_points_for_children_with_parent_value(parent_alpha,
-                                                                                                      parent_beta,
-                                                                                                      new_game_traversal,
-                                                                                                      visited,
-                                                                                                      moves_chosen
-                                                                                                      total_evaluated_nodes,
-                                                                                                      max_depth)
-        #     x=6
+                new_game_traversal = make_game_traversal(parent_index - 1, copy.deepcopy(parent[0]),
+                                                         copy.deepcopy(parent[1]),
+                                                         moves_chosen)
+                if new_game_traversal[0] == parent and len(new_game_traversal) == 1:
+                    continue
+
+                # pass is as beta,alpha but accept as alpha,beta
+                visited, total_evaluated_nodes, max_depth = traverse_children(parent_alpha,
+                                                                              parent_beta,
+                                                                              new_game_traversal,
+                                                                              visited,
+                                                                              moves_chosen,
+                                                                              total_evaluated_nodes,
+                                                                              max_depth)
+            else:
+
+                parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = produce_points_for_children(
+                    copy.deepcopy(parent), amount_of_tokens_on_board, total_evaluated_nodes, visited, max_depth, None)
+
+                if parent_alpha == -np.inf:
+                    parent_alpha = parent_beta
+                    parent_beta = np.inf
+                elif parent_beta == +np.inf:
+                    parent_beta = parent_alpha
+                    parent_alpha = -np.inf
+
+                previous_parent_turned_child = parent
         else:
-            child_alpha, child_beta, visited, winning_path, total_evaluated_nodes, max_depth = produce_points_for_children(
-                parent,
-                amount_of_tokens_on_board,
-                moves_chosen,
-                total_evaluated_nodes,
-                visited, max_depth)
+            if parent[1][1] % 2 == 0:
+                parent_alpha = -1
+            else:
+                parent_beta = +1
+            winning_path = parent[1][2]
+            total_evaluated_nodes += 1
 
-            # update parent alpha/beta but switch them because its switching game turns
-            if child_alpha is -np.inf:
-                child_alpha = child_beta
-                child_beta = np.inf
-            elif child_beta is np.inf:
-                child_beta = child_alpha
-                child_alpha = -np.inf
-            previous_parent_turned_child = parent
-            # total_visited_nodes += visited_nodes
-            print(parent)
-            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+        print(parent)
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
         previous_parent_turned_child = parent
+
+    print("\n\n\n\n")
     print("Winning path: " + str(winning_path))
-    return winning_path[0] if winning_path else None, child_alpha, len(
-        visited), total_evaluated_nodes, max_depth - 1, calculate_branching_factor_from_visited_nodes(visited)
+
+    if previous_parent_turned_child[1][1] % 2 == 0:
+        value = parent_beta
+    else:
+        value = parent_alpha
+
+    return winning_path[0] if winning_path else None, value, len(
+        visited), total_evaluated_nodes, max_depth - 1, 1  # calculate_branching_factor_from_visited_nodes(visited)
 
 
-def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, game_traversal, visited, moves_chosen_new
-                                                  total_evaluated_nodes, max_depth):
-    parent_alpha = -np.inf
-    parent_beta = +np.inf
+def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
+                      moves_chosen,
+                      total_evaluated_nodes, max_depth):
+    if parent_alpha == -np.inf:
+        grandpa_alpha = parent_beta
+        grandpa_beta = np.inf
+    elif parent_beta == +np.inf:
+        grandpa_beta = parent_alpha
+        grandpa_alpha = -np.inf
+
     children = []
-    last_chosen = 0
-
-    # game_traversal_copy = copy.deepcopy(game_traversal)
-    # same thing as before but with grandpa
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
+
+        amount_of_children = 0
         visited.add(tuple(parent[1][2]))
-        tokens_on_board = copy.deepcopy(parent[0])
-        # add loop here for other children
+
         amount_of_tokens_on_board = len(parent[0])
 
-        # if len(moves_chosen_new) != 0:
-        #     tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen_new]
-
-        moves_chosen = []
-        if last_chosen > 0:
-            moves_chosen.append(last_chosen)
-
         while amount_of_tokens_on_board != 0:
-            current_parent_game = copy.deepcopy(parent[1])
-            # modify the current game with past move as not to repeat the number tokens - moves
+            tokens_on_board = copy.deepcopy(parent[0])
+            current_parent = copy.deepcopy(parent[1])
+
             if len(moves_chosen) != 0:
                 tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
 
-            if len(moves_chosen_new) != 0:
-                tokens_on_board_new = [x for x in tokens_on_board if x not in moves_chosen_new]
-
-            # check if starting places exist
-            response = make_game_move(tokens_on_board_new, current_parent_game)
-
+            response = make_game_move(tokens_on_board, current_parent)
+            print(current_parent)
             if not response:
+
                 break
 
-            visited.add(tuple(current_parent_game[2]))
-            max_depth = update_max_depth(current_parent_game, max_depth)
+            visited.add(tuple(current_parent[2]))
+            max_depth = update_max_depth(current_parent, max_depth)
 
-            if current_parent_game not in children:
-                # get children
+            if current_parent not in children:
+                if len(game_traversal) - parent_index - 1 <= 0:
+                    tokens_on_board += moves_chosen
+                    child_score = determine_node_score(tokens_on_board, current_parent)
+                    total_evaluated_nodes += 1
+                    children.append(current_parent)
 
-                current_node_game_traversal = make_game_traversal(parent_index, copy.deepcopy(tokens_on_board_new),
-                                                                  copy.deepcopy(current_parent_game),
-                                                                  moves_chosen)
-                current_node_game_traversal[0][0] = list(set(current_node_game_traversal[0][0] + moves_chosen))
-                res = get_valued_children(current_node_game_traversal)
-                print(current_parent_game)
-                if res is None:
-                    break
-
-                total_evaluated_nodes += 1
-
-                # get possibly updated value
-                child_score = determine_node_score(tokens_on_board, current_parent_game)
-                # determine whos turn
-
-                if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent_game)):
-                    if len(tokens_on_board) % 2 == 0:
-                        child_score = 1
+                    if current_parent[1] % 2 == 0:
+                        parent_alpha = child_score
                     else:
-                        child_score = -1
-                    winning_path = current_parent_game[2]
-                    break
+                        parent_beta = child_score
 
-                if current_parent_game[1] % 2 == 0:
-                    parent_alpha = child_score
+                    if grandpa_alpha != -np.inf:  # more than
+                        if parent_beta < grandpa_alpha:
+                            print("Prune rest")
+                            break
+                            # return total_visited_nodes
+                    else:
+                        if parent_alpha > grandpa_beta:
+                            print("Prune rest")
+                            break
                 else:
-                    parent_beta = child_score
+                    current_node_game_traversal = make_game_traversal(parent_index, copy.deepcopy(tokens_on_board),
+                                                                      copy.deepcopy(current_parent),
+                                                                      moves_chosen)
+                    amount_of_children+=1
+                    x=6
 
-                if grandpa_alpha != -np.inf:  # more than
-                    if parent_beta < grandpa_alpha:
-                        print("Prune rest")
-                        break
-                        # return total_visited_nodes
-                else:
-                    if parent_alpha > grandpa_beta:
-                        print("Prune rest")
-                        break
-                        # return total_visited_nodes
-                amount_of_tokens_on_board = process_child_into_children(amount_of_tokens_on_board,
-                                                                        current_parent_game,
-                                                                        children, moves_chosen)
-        if len(parent[1][2]) > 0:
-            last_chosen = parent[1][2][-1]
-        print(parent)
-        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
     return visited, total_evaluated_nodes, max_depth
+
+
+# def produce_points_for_children_with_parent_value(grandpa_alpha, grandpa_beta, game_traversal, visited,
+#                                                   moves_chosen_new,
+#                                                   total_evaluated_nodes, max_depth):
+#     parent_alpha = -np.inf
+#     parent_beta = +np.inf
+#     children = []
+#     last_chosen = 0
+#
+#     # game_traversal_copy = copy.deepcopy(game_traversal)
+#     # same thing as before but with grandpa
+#     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
+#         visited.add(tuple(parent[1][2]))
+#         tokens_on_board = copy.deepcopy(parent[0])
+#         # add loop here for other children
+#         amount_of_tokens_on_board = len(parent[0])
+#
+#         # if len(moves_chosen_new) != 0:
+#         #     tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen_new]
+#
+#         moves_chosen = []
+#         if last_chosen > 0:
+#             moves_chosen.append(last_chosen)
+#
+#         while amount_of_tokens_on_board != 0:
+#             current_parent_game = copy.deepcopy(parent[1])
+#             # modify the current game with past move as not to repeat the number tokens - moves
+#             if len(moves_chosen) != 0:
+#                 tokens_on_board = [x for x in tokens_on_board if x not in moves_chosen]
+#
+#             if len(moves_chosen_new) != 0:
+#                 tokens_on_board_new = [x for x in tokens_on_board if x not in moves_chosen_new]
+#
+#             # check if starting places exist
+#             response = make_game_move(tokens_on_board_new, current_parent_game)
+#
+#             if not response:
+#                 break
+#
+#             visited.add(tuple(current_parent_game[2]))
+#             max_depth = update_max_depth(current_parent_game, max_depth)
+#
+#             if current_parent_game not in children:
+#                 # get children
+#
+#                 current_node_game_traversal = make_game_traversal(parent_index, copy.deepcopy(tokens_on_board_new),
+#                                                                   copy.deepcopy(current_parent_game),
+#                                                                   moves_chosen)
+#                 current_node_game_traversal[0][0] = list(set(current_node_game_traversal[0][0] + moves_chosen))
+#                 res = get_valued_children(current_node_game_traversal)
+#                 print(current_parent_game)
+#                 if res is None:
+#                     break
+#
+#                 total_evaluated_nodes += 1
+#
+#                 # get possibly updated value
+#                 child_score = determine_node_score(tokens_on_board, current_parent_game)
+#                 # determine whos turn
+#
+#                 if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent_game)):
+#                     if len(tokens_on_board) % 2 == 0:
+#                         child_score = 1
+#                     else:
+#                         child_score = -1
+#                     winning_path = current_parent_game[2]
+#                     break
+#
+#                 if current_parent_game[1] % 2 == 0:
+#                     parent_alpha = child_score
+#                 else:
+#                     parent_beta = child_score
+#
+#                 if grandpa_alpha != -np.inf:  # more than
+#                     if parent_beta < grandpa_alpha:
+#                         print("Prune rest")
+#                         break
+#                         # return total_visited_nodes
+#                 else:
+#                     if parent_alpha > grandpa_beta:
+#                         print("Prune rest")
+#                         break
+#                         # return total_visited_nodes
+#                 amount_of_tokens_on_board = process_child_into_children(amount_of_tokens_on_board,
+#                                                                         current_parent_game,
+#                                                                         children, moves_chosen)
+#         if len(parent[1][2]) > 0:
+#             last_chosen = parent[1][2][-1]
+#         print(parent)
+#         print("-------------------------------")
+#     return visited, total_evaluated_nodes, max_depth
 
 
 def get_valued_children(current_node_game_traversal):
     for game_index, game in enumerate((reversed(current_node_game_traversal)), start=0):
 
         if not make_game_move(copy.deepcopy(game[0]), copy.deepcopy(game[1])):
-            print("No children rest")
+            print("No children")
             return None
 
         children = []
@@ -259,8 +345,6 @@ def get_valued_children(current_node_game_traversal):
                 print(cur_game)
 
     return True
-
-
 
 
 def process_child_into_children(amount_of_tokens_on_board, child, children, moves_chosen):
@@ -327,20 +411,42 @@ def take_a_turn(tokens_left_on_board, game):
     return True
 
 
-def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
-                                total_evaluated_nodes, visited, max_depth):
-    child_alpha = -np.inf
-    child_beta = +np.inf
+def produce_points_for_children(child, amount_of_tokens_on_board,
+                                total_evaluated_nodes, visited, max_depth, score):
     winning_path = []
     children = []
 
     parent_alpha = -np.inf
     parent_beta = +np.inf
 
-    # produce possible children
+    golden_child = copy.deepcopy(child)
+    parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = evaluate_node(parent_alpha,
+                                                                                                       parent_beta,
+                                                                                                       golden_child[0],
+                                                                                                       golden_child[1],
+                                                                                                       winning_path,
+                                                                                                       total_evaluated_nodes,
+                                                                                                       visited,
+                                                                                                       max_depth)
+    if parent_alpha == -np.inf:
+        parent_alpha = parent_beta
+        parent_beta = np.inf
+    elif parent_beta == +np.inf:
+        parent_beta = parent_alpha
+        parent_alpha = -np.inf
+
+    moves_chosen = [child[1][2].pop()]
+    parent = [child[1][0], child[1][1] - 1, child[1][2], child[1][-1]]
+    tokens_on_board = child[0] + moves_chosen
+    amount_of_tokens_on_board += 1
+    # print(golden_child)
+    if parent_alpha == -1 or parent_beta == 1:
+        return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
+
+    # produce the siblings of golden child
     while amount_of_tokens_on_board > 0:
-        tokens_on_board = copy.deepcopy(parent[0])
-        game = copy.deepcopy(parent[1])
+        tokens_on_board = copy.deepcopy(tokens_on_board)
+        game = copy.deepcopy(parent)
 
         # modify the current game with past move as not to repeat the number
         if len(moves_chosen) != 0:
@@ -348,65 +454,70 @@ def produce_points_for_children(parent, amount_of_tokens_on_board, moves_chosen,
 
         # make move
         response = make_game_move(tokens_on_board, game)
-        if not response:
-            print("Prune rest")
-            if len(game[2]) % 2 == 0:
-                return +1, +np.inf, total_visited_nodes
-            else:
-                return -np.inf, -1, total_visited_nodes
-
         child = [tokens_on_board, game]
-        visited.add(tuple(child[1][2]))
-        max_depth = update_max_depth(child[1], max_depth)
 
         if child not in children:
             print(child[1])
+
+            if not response:
+                return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
+
+            visited.add(tuple(child[1][2]))
+            max_depth = update_max_depth(child[1], max_depth)
+
             # add previously removed choices back
             child[0].extend(moves_chosen)
-
-            # add the most current choice
-            # moves_chosen.append(child[1][2][-1])
-            # # add to evaluated children
-            # children.append(child)
-            # amount_of_tokens_on_board -= 1
-            # total_visited_nodes += 1
 
             amount_of_tokens_on_board = process_child_into_children(amount_of_tokens_on_board,
                                                                     child[1], children,
                                                                     moves_chosen)
 
-            # get possibly updated value
-            child_alpha, child_beta, winning_path = evaluate_alpha_beta(tokens_on_board, game,
-                                                                        child_alpha, child_beta, winning_path)
-            total_evaluated_nodes += 1
+            parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = evaluate_node(
+                parent_beta, parent_alpha, tokens_on_board, game, winning_path, total_evaluated_nodes, visited,
+                max_depth)
 
-            if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)): 
-                print("Prune rest")
-                winning_path = game[2]
-                if len(game[2]) % 2 == 0:
-                    return +1, +np.inf, visited, winning_path, total_evaluated_nodes, max_depth
-                else:
-                    return -np.inf, -1, visited, winning_path, total_evaluated_nodes, max_depth
-    #             set alpha or beta to be +/-1
+            # here
+
+            if parent_alpha == -1 or parent_beta == 1:
+                return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
+
+    return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
+
+
+def evaluate_node(child_alpha, child_beta, tokens_on_board, game, winning_path, total_evaluated_nodes, visited,
+                  max_depth):
+    child_alpha, child_beta, winning_path = evaluate_alpha_beta(tokens_on_board, game, child_alpha, child_beta,
+                                                                winning_path)
+    total_evaluated_nodes += 1
+
+    if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(game)):
+        print("Prune rest")
+        winning_path = game[2]
+        if len(game[2]) % 2 == 0:
+            return -1, +np.inf, visited, winning_path, total_evaluated_nodes, max_depth
+        else:
+            return -np.inf, +1, visited, winning_path, total_evaluated_nodes, max_depth
+
     return child_alpha, child_beta, visited, winning_path, total_evaluated_nodes, max_depth
 
 
-def evaluate_alpha_beta(tokens_on_board, game, child_alpha, child_beta, winning_path):
+def evaluate_alpha_beta(tokens_on_board, game, parent_alpha, parent_beta, winning_path):
     # are you a base node
     child_point = determine_node_score(tokens_on_board, game)
 
     # evaluate child_alpha and child_beta
     if game[1] % 2 == 0:  # even means child_alpha
-        if child_alpha == -np.inf or child_alpha > child_point:
-            child_alpha = child_point
-            child_beta = np.inf
+        if parent_alpha == -np.inf or parent_alpha > child_point:
+            parent_alpha = child_point
+            parent_beta = np.inf
             winning_path = game[2]
     else:  # odd means child_beta
-        if child_beta == np.inf or child_beta < child_point:
-            child_beta = child_point
-            child_alpha = -np.inf
+        if parent_beta == np.inf or parent_beta < child_point:
+            parent_beta = child_point
+            parent_alpha = -np.inf
             winning_path = game[2]
-    return child_alpha, child_beta, winning_path
+
+    return parent_alpha, parent_beta, winning_path
 
 
 def make_game_move(tokens_on_board, game):
@@ -552,9 +663,11 @@ if __name__ == '__main__':
     #         line.append(sys.argv[i])
     #     play_game(process_line(line))
     # else:
-
+    # while True:
+    # play_game([7, 0, [], 2])
     play_game([7, 1, [1], 2])
-    # play_game([7, 3, [1, 4, 2], 3])
+    # play_game([7, 1, [1], 2])
+    # play_game([7, 2, [1, 4], 0])
     # play_game(read_test_cases()[2])
 # if player_choices in possible_multiples:
 #     return game[0] + " lost"
