@@ -28,7 +28,7 @@ def play_game(game):
         correct_move, alpha_score, total_visited_nodes, max_depth_reached, avg_branching = \
             build_a_tree(game_traversal)
         print_output(correct_move[original_game[1]], alpha_score, total_visited_nodes, len(eval_nodes_global_list) + 1,
-                     max_depth_reached, avg_branching)
+                     max_depth_reached - original_game[-1], avg_branching)
 
 
 def print_output(move: str, value: float, visited_nodes: int, evaluated_nodes: int, max_depth_reach: int,
@@ -625,7 +625,7 @@ if __name__ == '__main__':
     # while True:
     # play_game([7, 0, [], 2])
     # play_game([3, 0, [], 0])
-    play_game([7, 1, [1], 2])
+    play_game([10, 3, [4, 2, 6], 4])
     # play_game([7, 2, [1, 4], 0])
     # play_game([10, 5, [3, 1, 8, 4, 2], 0])
     # play_game(read_test_cases()[2]) 3 0 [] 0
