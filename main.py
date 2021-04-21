@@ -82,7 +82,7 @@ def build_a_tree(game_traversal):
         visited.add(tuple(item[1][2]))
         max_depth = update_max_depth(item[1], max_depth)
 
-    winning_path = []
+    winning_path = game_traversal[-1][1][2]
 
     # iterate depth times
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
@@ -100,11 +100,23 @@ def build_a_tree(game_traversal):
                     if parent_beta == 1:
                         # automatic loss, prune
                         previous_parent_turned_child = parent
+                        if parent_alpha == -np.inf:
+                            parent_alpha = parent_beta
+                            parent_beta = np.inf
+                        elif parent_beta == +np.inf:
+                            parent_beta = parent_alpha
+                            parent_alpha = -np.inf
                         continue
                 else:
                     if parent_alpha == -1:
                         # automatic win, prune
                         previous_parent_turned_child = parent
+                        if parent_alpha == -np.inf:
+                            parent_alpha = parent_beta
+                            parent_beta = np.inf
+                        elif parent_beta == +np.inf:
+                            parent_beta = parent_alpha
+                            parent_alpha = -np.inf
                         continue
 
                 amount_of_tokens_on_board -= 1
@@ -124,7 +136,8 @@ def build_a_tree(game_traversal):
                     visited,
                     moves_chosen,
                     total_evaluated_nodes,
-                    max_depth)
+                    max_depth,
+                    winning_path)
                 previous_parent_turned_child = parent
             else:
 
@@ -166,7 +179,7 @@ def build_a_tree(game_traversal):
 
 def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
                       moves_chosen,
-                      total_evaluated_nodes, max_depth):
+                      total_evaluated_nodes, max_depth, winning_path):
     if parent_alpha == -np.inf:
         grandpa_alpha = parent_beta
         grandpa_beta = np.inf
@@ -174,7 +187,6 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
         grandpa_beta = parent_alpha
         grandpa_alpha = -np.inf
 
-    winning_path = []
     children = []
     for parent_index, parent in enumerate((reversed(game_traversal)), start=0):
 
@@ -201,7 +213,6 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
             if current_parent not in children:
                 print(current_parent)
                 tokens_on_board = tokens_on_board + moves_chosen
-                moves_chosen.append(current_parent[2][-1])
                 if not response:
                     break
                 if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent)):
@@ -655,6 +666,7 @@ if __name__ == '__main__':
     # else:
     # while True:
     play_game([7, 1, [1], 2])
+
     # play_game([7, 0, [], 2])
     # play_game([7, 1, [1], 2])
     # play_game([7, 2, [1, 4], 0])
