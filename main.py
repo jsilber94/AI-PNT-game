@@ -625,7 +625,9 @@ if __name__ == '__main__':
     # while True:
     # play_game([7, 0, [], 2])
     # play_game([3, 0, [], 0])
-    play_game([10, 3, [4, 2, 6], 4])
+    # play_game([10, 3, [4, 2, 6], 4])
+    # play_game([7, 1, [1], 2])
+    play_game([8, 3, [3,1,2], 2])
     # play_game([7, 2, [1, 4], 0])
     # play_game([10, 5, [3, 1, 8, 4, 2], 0])
     # play_game(read_test_cases()[2]) 3 0 [] 0
