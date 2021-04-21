@@ -161,7 +161,7 @@ def build_a_tree(game_traversal):
         value = parent_alpha
 
     return winning_path if winning_path else None, value, len(
-        visited), total_evaluated_nodes, max_depth - 1, 1  # calculate_branching_factor_from_visited_nodes(visited)
+        visited), total_evaluated_nodes, max_depth - 1, calculate_branching_factor_from_visited_nodes(visited)
 
 
 def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
@@ -381,23 +381,22 @@ def first_move_check(limit, invalid_choices, tokens_left_on_board):
 
 
 def take_a_turn(tokens_left_on_board, game):
-    player_choices = []
     last_chosen = game[2][-1]
+    choice = None
 
-    while True:
-        choice = random.randrange(1, game[0] + 1)
-        player_choices.append(choice)
-
-        if (choice % last_chosen == 0 or last_chosen % choice == 0) and choice in tokens_left_on_board:
+    for token in tokens_left_on_board:
+        if (token % last_chosen == 0 or last_chosen % token == 0) and token in tokens_left_on_board:
+            choice = token
             break
 
-        if choice == 1 and choice in tokens_left_on_board:
+        if token == 1 and token in tokens_left_on_board:
+            choice = token
             break
-
-        if set(tokens_left_on_board).issubset(list(set(player_choices))):
-            return False
 
     # remove choice from board and update game
+    if choice is None:
+        return False
+
     tokens_left_on_board.remove(choice)
     game[1] += 1
     game[2].append(choice)
@@ -470,7 +469,6 @@ def produce_points_for_children(parent, amount_of_tokens_on_board,
             parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = evaluate_node(
                 parent_beta, parent_alpha, tokens_on_board, game, winning_path, total_evaluated_nodes, visited,
                 max_depth)
-
 
             if parent_alpha == -1 or parent_beta == 1:
                 # continue
@@ -659,9 +657,9 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
     # while True:
-    # play_game([7, 1, [1], 2])
+    play_game([7, 1, [1], 2])
     # play_game([7, 0, [], 2])
-    play_game([3, 0, [], 0])
+    # play_game([3, 0, [], 0])
     # play_game([7, 1, [1], 2])
     # play_game([7, 2, [1, 4], 0])
     # play_game(read_test_cases()[2]) 3 0 [] 0
