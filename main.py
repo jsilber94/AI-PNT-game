@@ -3,6 +3,8 @@ import random
 
 import numpy as np
 
+eval_nodes_global_list = set()
+
 
 def play_game(game):
     original_game = copy.deepcopy(game)
@@ -25,7 +27,7 @@ def play_game(game):
         game_traversal = make_game_traversal(depth, tokens_left_on_board, game, [])
         correct_move, alpha_score, total_visited_nodes, evaluated_nodes, max_depth_reached, avg_branching = \
             build_a_tree(game_traversal)
-        print_output(correct_move[original_game[1]], alpha_score, total_visited_nodes, evaluated_nodes,
+        print_output(correct_move[original_game[1]], alpha_score, total_visited_nodes, len(eval_nodes_global_list) + 1,
                      max_depth_reached, avg_branching)
 
 
@@ -217,17 +219,6 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
                     # 1,6,3 vs 1,5
                     winning_path = current_parent[2]
                     return visited, winning_path, total_evaluated_nodes, max_depth, parent_alpha, parent_beta
-
-                    parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth = evaluate_node(
-                        parent_alpha, parent_beta, tokens_on_board, current_parent, winning_path, total_evaluated_nodes,
-                        visited,
-                        max_depth)
-                    if current_parent[1] % 2 == 0:
-                        child_score = parent_alpha
-                    else:
-                        child_score = parent_beta
-
-                    # return visited, winning_path, total_evaluated_nodes, max_depth, parent_alpha, parent_beta
                 else:
 
                     depth = max_depth - 1 - parent_index - 1
@@ -524,6 +515,9 @@ def determine_node_score(tokens_left_on_board, game):
     player_mutator = 1 if len(game[2]) % 2 == 0 else -1
     last_chosen = game[2][-1]
 
+    global eval_nodes_global_list
+    eval_nodes_global_list.add(tuple(game[2]))
+
     # if 1 in tokens_left_on_board:
     value = 0
     if 1 in tokens_left_on_board:
@@ -657,11 +651,12 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
     # while True:
-    play_game([7, 1, [1], 2])
+    # play_game([7, 1, [1], 2])
     # play_game([7, 0, [], 2])
     # play_game([3, 0, [], 0])
-    # play_game([7, 1, [1], 2])
+    play_game([7, 1, [1], 2])
     # play_game([7, 2, [1, 4], 0])
+    # play_game([10, 5, [3, 1, 8, 4, 2], 0])
     # play_game(read_test_cases()[2]) 3 0 [] 0
 # if player_choices in possible_multiples:
 #     return game[0] + " lost"
