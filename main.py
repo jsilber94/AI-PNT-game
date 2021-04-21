@@ -201,7 +201,7 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
             if current_parent not in children:
                 print(current_parent)
                 tokens_on_board = tokens_on_board + moves_chosen
-                moves_chosen.append(current_parent[2][-1])
+
                 if not response:
                     break
                 if not make_game_move(copy.deepcopy(tokens_on_board), copy.deepcopy(current_parent)):
@@ -234,7 +234,7 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
                     child_score, visited, total_evaluated_nodes = depth_children(depth, tokens_on_board, current_parent,
                                                                                  grandpa_alpha, grandpa_beta, visited,
                                                                                  total_evaluated_nodes, max_depth)
-
+                moves_chosen.append(current_parent[2][-1])
                 tokens_on_board += moves_chosen
                 total_evaluated_nodes += 1
                 children.append(current_parent)
@@ -250,14 +250,14 @@ def traverse_children(parent_alpha, parent_beta, game_traversal, visited,
                         print("parent_alpha: " + str(parent_alpha) + " parent_beta: " + str(parent_beta))
                         print("grandpa_alpha: " + str(grandpa_alpha) + " grandpa_beta: " + str(grandpa_beta))
                         winning_path = current_parent[2]
-                        break
+                        continue
                 else:
                     if parent_alpha > grandpa_beta:
                         winning_path = current_parent[2]
                         print("Prune rest because grandparent")
                         print("parent_alpha: " + str(parent_alpha) + " parent_beta: " + str(parent_beta))
                         print("grandpa_alpha: " + str(grandpa_alpha) + " grandpa_beta: " + str(grandpa_beta))
-                        break
+                        continue
 
                     amount_of_children += 1
 
@@ -307,10 +307,13 @@ def depth_children(depth, tokens_on_board_original, game_original, grandpa_alpha
                     parent_alpha, parent_beta, tokens_on_board, game, winning_path, total_evaluated_nodes, visited,
                     max_depth)
 
-                if parent_beta == 1:
-                    return parent_beta, visited, total_evaluated_nodes
-                elif parent_alpha == -1:
-                    return parent_alpha, visited, total_evaluated_nodes
+                if parent_beta == 1 or parent_alpha == -1:
+                    continue
+                # if parent_beta == 1:
+                #     return parent_beta, visited, total_evaluated_nodes
+                # elif parent_alpha == -1:
+                #     return parent_alpha, visited, total_evaluated_nodes
+
             if game[1] % 2 == 0:
                 parent_alpha = child_score
             else:
@@ -468,7 +471,9 @@ def produce_points_for_children(parent, amount_of_tokens_on_board,
                 parent_beta, parent_alpha, tokens_on_board, game, winning_path, total_evaluated_nodes, visited,
                 max_depth)
 
+
             if parent_alpha == -1 or parent_beta == 1:
+                # continue
                 return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
 
     return parent_alpha, parent_beta, visited, winning_path, total_evaluated_nodes, max_depth
@@ -654,11 +659,12 @@ if __name__ == '__main__':
     #     play_game(process_line(line))
     # else:
     # while True:
-    play_game([7, 1, [1], 2])
+    # play_game([7, 1, [1], 2])
     # play_game([7, 0, [], 2])
+    play_game([3, 0, [], 0])
     # play_game([7, 1, [1], 2])
     # play_game([7, 2, [1, 4], 0])
-    # play_game(read_test_cases()[2])
+    # play_game(read_test_cases()[2]) 3 0 [] 0
 # if player_choices in possible_multiples:
 #     return game[0] + " lost"
 # possible_multiples = list(range(1, last_chosen, game[1]))
